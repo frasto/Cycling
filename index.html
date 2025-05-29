@@ -1,0 +1,76 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GPX Street View Ride</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    #map, #pano { width: 50%; height: 90vh; float: left; }
+    #controls { padding: 1em; clear: both; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="pano"></div>
+
+  <div id="controls">
+    <input type="file" id="upload" accept=".gpx" />
+    <label>Blickrichtung (0–360): 
+      <input type="number" id="heading" value="0" min="0" max="360" step="5">
+    </label>
+    <progress id="progress" value="0" max="100" style="width: 200px;"></progress>
+  </div>
+
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+  <script>
+    let map, panorama, route = [], marker, currentIndex = 0;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 14,
+        center: { lat: 48.7758, lng: 9.1829 }
+      });
+      panorama = new google.maps.StreetViewPanorama(
+        document.getElementById("pano"), {
+          pov: { heading: 0, pitch: 0 }
+        }
+      );
+      map.setStreetView(panorama);
+    }
+
+    document.getElementById("upload").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function() {
+        const xml = new DOMParser().parseFromString(reader.result, "application/xml");
+        const geojson = toGeoJSON.gpx(xml);
+        route = geojson.features[0].geometry.coordinates.map(([lng, lat]) => ({lat, lng}));
+        if (route.length === 0) return;
+        currentIndex = 0;
+        map.setCenter(route[0]);
+        if (!marker) marker = new google.maps.Marker({ position: route[0], map });
+        driveRoute();
+      };
+      reader.readAsText(file);
+    });
+
+    function driveRoute() {
+      if (currentIndex >= route.length) return;
+      const pos = route[currentIndex];
+      marker.setPosition(pos);
+      panorama.setPosition(pos);
+      const heading = parseInt(document.getElementById("heading").value);
+      panorama.setPov({ heading: heading, pitch: 0 });
+
+      const progress = document.getElementById("progress");
+      progress.value = Math.round((currentIndex / route.length) * 100);
+
+      currentIndex++;
+      setTimeout(driveRoute, 1800);
+    }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
